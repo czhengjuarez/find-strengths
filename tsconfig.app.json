@@ -1,31 +1,27 @@
 {
+  "extends": "./tsconfig.json",
   "compilerOptions": {
-    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
-    "target": "ES2022",
-    "useDefineForClassFields": true,
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "ESNext",
-    "skipLibCheck": true,
+    // Tells TypeScript this is part of a composite project,
+    // which is necessary for the `tsc -b` build command.
+    "composite": true,
 
-    
-    "moduleResolution": "bundler",
-    "allowImportingTsExtensions": true,
-    "verbatimModuleSyntax": true,
-    "moduleDetection": "force",
-    "noEmit": true,
+    // Specifies where to store build information to speed up subsequent builds.
+    "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
+
+    // --- FIXES FOR YOUR BUILD ERRORS ---
+
+    // 1. Enables JSX support for React 17+ new transform.
     "jsx": "react-jsx",
 
-     "baseUrl": ".",
+    // 2. Sets the base directory for module resolution.
+    "baseUrl": ".",
+
+    // 3. Defines the '@' path alias to point to your 'src' directory.
     "paths": {
       "@/*": ["./src/*"]
-    },
-    
-    "strict": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUncheckedSideEffectImports": true
+    }
   },
+  // Specifies that only files in the 'src' directory should be
+  // included in this part of the compilation.
   "include": ["src"]
 }
