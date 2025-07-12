@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useLocalStorage } from "@/hooks/useLocalStorage";
+import { SimpleHeader } from "@/components/SimpleHeader";
 import {
   Accordion,
   AccordionContent,
@@ -11,6 +12,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { RotateCcw, Lightbulb } from "lucide-react";
+import jsPDF from 'jspdf';
 
 // 1. Define the structure for each level's content
 const problemSolvingLevels = [
@@ -58,6 +60,7 @@ export default function App() {
     "problemSolvingInputs_v1",
     problemSolvingLevels.map(level => ({ level: level.value, userText: "" }))
   );
+  const [isDownloading, setIsDownloading] = useState(false);
 
   // Handler to update the text for a specific level
   const handleTextChange = (levelValue: string, newText: string) => {
@@ -75,16 +78,63 @@ export default function App() {
     }
   };
 
+  // PDF Download Handler
+  const handleDownloadPDF = () => {
+    setIsDownloading(true);
+    try {
+      const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+      let y = 15;
+      const margin = 15;
+      const maxWidth = doc.internal.pageSize.width - margin * 2;
+
+      const addPageIfNeeded = (spaceNeeded: number) => {
+        if (y + spaceNeeded > doc.internal.pageSize.height - margin) {
+          doc.addPage();
+          y = margin;
+        }
+      };
+
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(22);
+      doc.setTextColor("#8F1F57");
+      doc.text("5 Levels of Problem-Solving", margin, y);
+      y += 15;
+
+      problemSolvingLevels.forEach((level, index) => {
+        const userInput = levelInputs.find(i => i.level === level.value)?.userText || "No entry.";
+        
+        addPageIfNeeded(20);
+        doc.setFont("helvetica", "bold");
+        doc.setFontSize(16);
+        doc.setTextColor("#000000");
+        doc.text(`Level ${index + 1}: ${level.title.split(': ')[1]}`, margin, y);
+        y += 8;
+
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(11);
+        const splitContent = doc.splitTextToSize(userInput, maxWidth);
+        addPageIfNeeded(splitContent.length * 5 + 10);
+        doc.text(splitContent, margin, y);
+        y += splitContent.length * 5 + 10;
+      });
+
+      doc.save(`5-levels-problem-solving-${new Date().toISOString().split('T')[0]}.pdf`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-50 text-slate-800">
-      <div className="container mx-auto max-w-4xl py-12 px-4">
+      <SimpleHeader
+        onDownloadPDF={handleDownloadPDF}
+        isDownloading={isDownloading}
+        onReset={handleReset}
+      />
+      <div className="container mx-auto max-w-4xl pt-24 pb-12 px-4"> {/* Adjusted padding for fixed header */}
         
-        {/* Header Section */}
-        <header className="mb-8 text-center">
-          <h1 className="text-4xl font-bold text-primary mb-2">The 5 Levels of Problem-Solving</h1>
-          <p className="text-lg text-muted-foreground">A framework for strategic thinking in Design Operations.</p>
-        </header>
-
         {/* Introduction Section */}
         <div className="mb-10 p-6 bg-white rounded-lg border">
           <p className="mb-4">The 5 levels of problem-solving framework provides a powerful structure for how you approach leadership with challenges and opportunities (Jansen & Iglesias, as cited in Corporate Rebels, 2023).</p>
@@ -132,16 +182,12 @@ export default function App() {
           })}
         </Accordion>
 
-        {/* Conclusion and Reset Button */}
+        {/* Conclusion Section */}
         <div className="mt-10 text-center">
           <div className="mb-6 p-6 bg-white rounded-lg border">
             <h2 className="text-2xl font-bold text-primary mb-2">Key Insight</h2>
             <p className="text-lg">Always aim to come to leadership at the highest level possible. When someone comes to you at any level, encourage them to go one level up. This builds trust and demonstrates strategic thinking.</p>
           </div>
-          <Button variant="outline" onClick={handleReset}>
-            <RotateCcw className="mr-2 h-4 w-4" />
-            Clear All Entries
-          </Button>
         </div>
 
       </div>
