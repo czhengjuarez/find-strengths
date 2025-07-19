@@ -1,84 +1,120 @@
 // src/App.tsx
 
 import { useState } from "react";
-import { useLocalStorage } from "@/hooks/useLocalStorage";
-import { SimpleHeader } from "@/components/SimpleHeader";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Textarea } from "@/components/ui/textarea";
+import { useLocalStorage } from "./hooks/useLocalStorage";
+import { Header } from "@/components/Header";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { RotateCcw, Lightbulb } from "lucide-react";
 import jsPDF from 'jspdf';
+import { XCircle, PlusCircle } from "lucide-react";
 
-// 1. Define the structure for each level's content
-const problemSolvingLevels = [
+// --- Data Structure for the Checklist ---
+const checklistData = [
   {
-    value: "level-1",
-    title: "Level 1: Problem Identification",
-    description: "You identify and state the problem clearly.",
-    example: "Our design reviews are consistently running over time and blocking releases.",
+    mainTitle: "Before the Meeting",
+    subsections: [
+      { id: "stakeholder-setup", title: "Stakeholder & Context Setup", items: [ "Identify key stakeholders (Design, PM, Eng, others)", "Define the core problem to be solved", "Draft a rough timeline or milestone expectations", "Clarify decision-makers and approvers" ] },
+      { id: "partner-research", title: "Partner Research & Preparation", items: [ "Understand partner priorities and constraints (what they're measured on, current capacity, competing priorities)", "Research any relevant history (past collaborations, known friction points, previous project outcomes)" ] }
+    ]
   },
   {
-    value: "level-2",
-    title: "Level 2: Problem Recognition",
-    description: "You diagnose the root cause of the problem.",
-    example: "Our design review process is broken because we don't have clear criteria for what constitutes 'ready for review,' and we're trying to solve too many problems in these meetings.",
+    mainTitle: "During the Kickoff",
+    subsections: [
+      { id: "goals-alignment", title: "Goals & Success Alignment", items: [ "Agree on shared goals and success criteria", "Clarify roles and responsibilities (RACI if needed)", "Set quality standards or definition of done for each discipline", "Identify what \"done\" looks like overall" ] },
+      { id: "comm-process", title: "Communication & Process Setup", items: [ "Outline communication norms (sync vs async, update cadence)", "Define escalation paths (who to involve when decisions get stuck)", "Agree on change management process (how to handle scope/timeline changes)", "Establish a space for documentation (e.g. Confluence, Notion, Figma board)" ] },
+      { id: "deps-resources", title: "Dependencies & Resources", items: [ "Discuss risks, assumptions, and constraints", "Identify dependencies (what this project depends on, what depends on this project)", "Discuss resource allocation (time commitments, tool access, budget if relevant)" ] },
+      { id: "meeting-planning", title: "Meeting Planning", items: [ "Schedule follow-up or check-in meetings", "Schedule a retrospective at project completion (to improve future collaborations)" ] }
+    ]
   },
   {
-    value: "level-3",
-    title: "Level 3: Multiple Solutions Considered",
-    description: "You research and propose several potential solutions.",
-    example: "I've identified three approaches to fix our design review process: implementing a design review checklist, splitting reviews into different types (concept vs. execution), or moving to asynchronous reviews with synchronous follow-ups. I'm not sure which would work best for our team.",
-  },
-  {
-    value: "level-4",
-    title: "Level 4: Recommended Solution",
-    description: "You analyze the options and recommend the best course of action with justification.",
-    example: "I recommend we implement a tiered review system with clear entry criteria. This would reduce review time by an estimated 40% and improve quality by ensuring designs are properly vetted before review.",
-  },
-  {
-    value: "level-5",
-    title: "Level 5: Solution Implemented",
-    description: "You have already taken action and can report on the results.",
-    example: "I've implemented the new design review process over the past month. Review times are down 35%, and designer satisfaction with the process has increased significantly. Here's what we learned and how we might optimize further.",
-  },
+    mainTitle: "After the Meeting",
+    subsections: [
+      { id: "doc-comm", title: "Documentation & Communication", items: [ "Summarize key decisions and next steps in writing", "Share meeting notes with all stakeholders", "Create shared project dashboard/tracker (not just documentation space, but progress visibility)" ] },
+      { id: "system-setup", title: "System Setup", items: [ "Add stakeholders to relevant tools/systems (Slack channels, project boards, etc.)", "Set a reminder to check on progress at key milestones" ] },
+      { id: "relationship-mgmt", title: "Ongoing Relationship Management", items: [ "Plan \"How's our collaboration going?\" checkpoint questions for ongoing projects" ] }
+    ]
+  }
 ];
 
-// 2. Define the structure for user input
-interface LevelInput {
-  level: string;
-  userText: string;
+const quickReferenceData = {
+  mainTitle: "Quick Reference: Key Questions to Answer",
+  items: [
+    { title: "Goals", question: "What are we trying to achieve and how will we know we succeeded?" },
+    { title: "Roles", question: "Who does what, and who makes final decisions?" },
+    { title: "Communication", question: "How often do we sync, and through what channels?" },
+    { title: "Dependencies", question: "What do we need from others, and what do others need from us?" },
+    { title: "Quality", question: "What does \"good enough\" vs \"excellent\" look like for each discipline?" },
+    { title: "Changes", question: "How do we handle scope creep or timeline shifts?" },
+    { title: "Escalation", question: "Who do we involve when we're stuck?" }
+  ]
+};
+
+interface ChecklistItem {
+  id: number;
+  text: string;
+  completed: boolean;
 }
 
+// --- Helper to create the initial state ---
+const getInitialState = () => {
+  const state: { [key: string]: ChecklistItem[] } = {};
+  checklistData.forEach(section => {
+    section.subsections.forEach(subsection => {
+      state[subsection.id] = subsection.items.map((itemText, index) => ({
+        id: Date.now() + index,
+        text: itemText,
+        completed: false
+      }));
+    });
+  });
+  return state;
+};
+
 export default function App() {
-  // 3. Set up state with Local Storage
-  const [levelInputs, setLevelInputs] = useLocalStorage<LevelInput[]>(
-    "problemSolvingInputs_v1",
-    problemSolvingLevels.map(level => ({ level: level.value, userText: "" }))
-  );
+  const [checklistItems, setChecklistItems] = useLocalStorage<{ [key: string]: ChecklistItem[] }>('xfnChecklistItems_v1', getInitialState());
+  const [newItemTexts, setNewItemTexts] = useState<{ [key: string]: string }>({});
   const [isDownloading, setIsDownloading] = useState(false);
 
-  // Handler to update the text for a specific level
-  const handleTextChange = (levelValue: string, newText: string) => {
-    setLevelInputs(prevInputs =>
-      prevInputs.map(input =>
-        input.level === levelValue ? { ...input, userText: newText } : input
-      )
-    );
+  // --- Handlers ---
+  const handleToggle = (listId: string, itemId: number) => {
+    setChecklistItems(prev => ({
+      ...prev,
+      [listId]: prev[listId].map(item => item.id === itemId ? { ...item, completed: !item.completed } : item)
+    }));
   };
 
-  // Handler to reset all inputs
+  const handleDelete = (listId: string, itemId: number) => {
+    setChecklistItems(prev => ({
+      ...prev,
+      [listId]: prev[listId].filter(item => item.id !== itemId)
+    }));
+  };
+
+  const handleAdd = (listId: string) => {
+    const text = newItemTexts[listId] || "";
+    if (text.trim() === "") return;
+    const newItem: ChecklistItem = { id: Date.now(), text, completed: false };
+    setChecklistItems(prev => ({
+      ...prev,
+      [listId]: [...(prev[listId] || []), newItem]
+    }));
+    setNewItemTexts(prev => ({ ...prev, [listId]: "" }));
+  };
+
+  const handleTextChange = (listId: string, text: string) => {
+    setNewItemTexts(prev => ({ ...prev, [listId]: text }));
+  };
+
   const handleReset = () => {
-    if (window.confirm("Are you sure you want to clear all your entries?")) {
-      setLevelInputs(problemSolvingLevels.map(level => ({ level: level.value, userText: "" })));
+    if (window.confirm("Are you sure you want to reset the entire checklist?")) {
+      setChecklistItems(getInitialState());
+      setNewItemTexts({});
     }
   };
 
-  // PDF Download Handler
   const handleDownloadPDF = () => {
     setIsDownloading(true);
     try {
@@ -97,28 +133,45 @@ export default function App() {
       doc.setFont("helvetica", "bold");
       doc.setFontSize(22);
       doc.setTextColor("#8F1F57");
-      doc.text("5 Levels of Problem-Solving", margin, y);
+      doc.text("XFN Kickoff Checklist", margin, y);
       y += 15;
 
-      problemSolvingLevels.forEach((level, index) => {
-        const userInput = levelInputs.find(i => i.level === level.value)?.userText || "No entry.";
-        
-        addPageIfNeeded(20);
+      checklistData.forEach(section => {
+        addPageIfNeeded(12);
         doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
+        doc.setFontSize(18);
         doc.setTextColor("#000000");
-        doc.text(`Level ${index + 1}: ${level.title.split(': ')[1]}`, margin, y);
+        doc.text(section.mainTitle, margin, y);
         y += 8;
 
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(11);
-        const splitContent = doc.splitTextToSize(userInput, maxWidth);
-        addPageIfNeeded(splitContent.length * 5 + 10);
-        doc.text(splitContent, margin, y);
-        y += splitContent.length * 5 + 10;
+        section.subsections.forEach(subsection => {
+          addPageIfNeeded(10);
+          doc.setFont("helvetica", "bold");
+          doc.setFontSize(14);
+          doc.text(subsection.title, margin, y);
+          y += 6;
+
+          doc.setFont("helvetica", "normal");
+          doc.setFontSize(11);
+          const items = checklistItems[subsection.id] || [];
+          if (items.length > 0) {
+            items.forEach(item => {
+              const itemStatus = item.completed ? '[x]' : '[ ]';
+              const itemLines = doc.splitTextToSize(item.text, maxWidth - 10);
+              addPageIfNeeded(itemLines.length * 5 + 2);
+              doc.text(`${itemStatus} ${itemLines[0]}`, margin + 5, y);
+              if (itemLines.length > 1) {
+                doc.text(itemLines.slice(1), margin + 11, y + 5);
+                y += (itemLines.length - 1) * 5;
+              }
+              y += 5;
+            });
+          }
+          y += 4;
+        });
       });
 
-      doc.save(`5-levels-problem-solving-${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(`xfn-kickoff-checklist-${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error("Error generating PDF:", error);
     } finally {
@@ -128,69 +181,65 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-gray-50 text-slate-800">
-      <SimpleHeader
-        onDownloadPDF={handleDownloadPDF}
-        isDownloading={isDownloading}
-        onReset={handleReset}
-      />
-      <div className="container mx-auto max-w-4xl pt-24 pb-12 px-4"> {/* Adjusted padding for fixed header */}
-        
-        {/* Introduction Section */}
-        <div className="mb-10 p-6 bg-white rounded-lg border">
-          <p className="mb-4">The 5 levels of problem-solving framework provides a powerful structure for how you approach leadership with challenges and opportunities (Jansen & Iglesias, as cited in Corporate Rebels, 2023).</p>
-          <p>Use this tool to structure your thoughts and push yourself to the highest level possible before presenting a problem.</p>
+      <Header onDownloadPDF={handleDownloadPDF} isDownloading={isDownloading} onReset={handleReset} />
+      <main className="container mx-auto max-w-4xl pt-24 pb-12 px-4">
+        <div className="text-center mb-8">
+          {/* UPDATED: Changed text-4xl to text-3xl */}
+          <h1 className="text-3xl font-bold text-gray-900">Cross-Functional Kickoff Checklist</h1>
+          <p className="mt-2 text-lg text-muted-foreground">Use this checklist to align with a cross-functional partner before starting a shared initiative.</p>
         </div>
 
-        {/* Accordion for the 5 Levels */}
-        <Accordion type="single" collapsible className="w-full" defaultValue="level-1">
-          {problemSolvingLevels.map((level, index) => {
-            const currentInput = levelInputs.find(i => i.level === level.value);
-            return (
-              <AccordionItem value={level.value} key={level.value}>
-                <AccordionTrigger className="text-xl font-semibold text-primary hover:no-underline">
-                  <div className="flex items-center gap-3">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-primary text-primary-foreground">{index + 1}</span>
-                    {level.title}
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="pt-4 pb-6 border-l-2 border-accent ml-4 pl-8">
-                  <div className="space-y-6">
-                    <div>
-                      <h3 className="font-semibold text-lg mb-2">Definition</h3>
-                      <p className="text-muted-foreground">{level.description}</p>
+        <div className="space-y-8">
+          {checklistData.map(section => (
+            <Card key={section.mainTitle}>
+              <CardHeader>
+                <CardTitle className="text-2xl font-semibold text-gray-800">{section.mainTitle}</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                {section.subsections.map(subsection => (
+                  <div key={subsection.id} className="border-t pt-4">
+                    <h3 className="text-lg font-semibold mb-3">{subsection.title}</h3>
+                    <div className="space-y-2">
+                      {(checklistItems[subsection.id] || []).map(item => (
+                        <div key={item.id} className="flex items-center space-x-3">
+                          <Checkbox id={`${subsection.id}-${item.id}`} checked={item.completed} onCheckedChange={() => handleToggle(subsection.id, item.id)} />
+                          <Label htmlFor={`${subsection.id}-${item.id}`} className={`flex-grow text-base ${item.completed ? 'line-through text-muted-foreground' : ''}`}>{item.text}</Label>
+                          <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(subsection.id, item.id)}>
+                            <XCircle className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                          </Button>
+                        </div>
+                      ))}
                     </div>
-                    <div>
-                      <h3 className="font-semibold text-lg mb-2">Example</h3>
-                      <p className="italic bg-accent/50 p-4 rounded-md text-muted-foreground">"{level.example}"</p>
-                    </div>
-                    <div>
-                      <h3 className="font-semibold text-lg mb-2 flex items-center gap-2">
-                        <Lightbulb className="w-5 h-5 text-secondary" />
-                        Your Turn: Draft Your Statement
-                      </h3>
-                      <Textarea
-                        placeholder={`Draft your statement for Level ${index + 1}...`}
-                        className="min-h-32 text-base"
-                        value={currentInput?.userText || ""}
-                        onChange={(e) => handleTextChange(level.value, e.target.value)}
+                    <div className="flex items-center space-x-2 pt-3 mt-2">
+                      <Input 
+                        placeholder="Add your own item..." 
+                        value={newItemTexts[subsection.id] || ""}
+                        onChange={(e) => handleTextChange(subsection.id, e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAdd(subsection.id)}
                       />
+                      <Button onClick={() => handleAdd(subsection.id)} size="sm"><PlusCircle className="h-4 w-4 mr-2" />Add</Button>
                     </div>
                   </div>
-                </AccordionContent>
-              </AccordionItem>
-            );
-          })}
-        </Accordion>
+                ))}
+              </CardContent>
+            </Card>
+          ))}
 
-        {/* Conclusion Section */}
-        <div className="mt-10 text-center">
-          <div className="mb-6 p-6 bg-white rounded-lg border">
-            <h2 className="text-2xl font-bold text-primary mb-2">Key Insight</h2>
-            <p className="text-lg">Always aim to come to leadership at the highest level possible. When someone comes to you at any level, encourage them to go one level up. This builds trust and demonstrates strategic thinking.</p>
-          </div>
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-2xl font-semibold text-gray-800">{quickReferenceData.mainTitle}</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {quickReferenceData.items.map(item => (
+                <div key={item.title}>
+                  <h3 className="font-semibold">{item.title}:</h3>
+                  <p className="text-muted-foreground">{item.question}</p>
+                </div>
+              ))}
+            </CardContent>
+          </Card>
         </div>
-
-      </div>
+      </main>
     </div>
   );
 }

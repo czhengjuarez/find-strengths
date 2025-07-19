@@ -15,10 +15,10 @@ export function SimpleHeader({ onDownloadPDF, isDownloading, onReset }: SimpleHe
       <div className="container mx-auto max-w-4xl px-4">
         <div className="flex justify-between items-center h-16">
           <div className="flex-shrink-0">
-            <span className="text-xl font-bold text-primary">5 Levels of Problem-Solving</span>
+            {/* UPDATED: Changed text-primary to text-gray-900 */}
+            <span className="text-xl font-bold text-gray-900">XFN Kickoff Checklist</span>
           </div>
           <div className="flex items-center gap-2">
-            {/* UPDATED: Removed explicit color classes to use the default outline style */}
             <Button 
               variant="outline" 
               size="sm" 
@@ -28,12 +28,10 @@ export function SimpleHeader({ onDownloadPDF, isDownloading, onReset }: SimpleHe
               Reset
             </Button>
             
-            {/* This button retains the primary brand color style */}
             <Button 
               onClick={onDownloadPDF} 
               disabled={isDownloading} 
               size="sm"
-              className="bg-[#8F1F57] text-white hover:bg-[#DD388B]"
             >
               {isDownloading ? (
                 <>
