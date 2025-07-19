@@ -1,3 +1,6 @@
 name = "xfn-kickoff-checklist"
 main = "src/index.ts"
 compatibility_date = "2025-07-19"
+
+[assets]
+bucket = "./public"
