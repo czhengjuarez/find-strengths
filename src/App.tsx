@@ -85,7 +85,6 @@ const ChecklistSection = ({ title, subsections, checklistItems, newItemTexts, ha
             {(checklistItems[subsection.id] || []).map((item: ChecklistItem) => (
               <div key={item.id} className="flex items-center space-x-3">
                 <Checkbox id={`${subsection.id}-${item.id}`} checked={item.completed} onCheckedChange={() => handleToggle(subsection.id, item.id)} />
-                {/* UPDATED: Added font-normal to the Label */}
                 <Label htmlFor={`${subsection.id}-${item.id}`} className={`flex-grow text-base font-normal ${item.completed ? 'line-through text-muted-foreground' : ''}`}>{item.text}</Label>
                 <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(subsection.id, item.id)}>
                   <XCircle className="h-4 w-4 text-gray-400 hover:text-red-500" />
@@ -189,16 +188,16 @@ export default function App() {
           <ChecklistSection title={checklistData.after.mainTitle} subsections={checklistData.after.subsections} {...{ checklistItems, newItemTexts, handleToggle, handleDelete, handleAdd, handleTextChange }} />
         </div>
 
-        {/* UPDATED: Quick Reference section is now full-width at the bottom */}
         <Card>
           <CardHeader>
             <CardTitle className="text-2xl font-semibold text-gray-800">{checklistData.quickReference.mainTitle}</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             {checklistData.quickReference.items.map((item: any) => (
-              <div key={item.title}>
-                <h3 className="font-semibold">{item.title}:</h3>
-                <p className="text-muted-foreground">{item.question}</p>
+              <div key={item.title} className="p-4 border rounded-lg bg-gray-50/50">
+                {/* UPDATED: Changed text-primary to text-gray-900 */}
+                <h3 className="font-semibold text-gray-900">{item.title}:</h3>
+                <p className="text-muted-foreground mt-1">{item.question}</p>
               </div>
             ))}
           </CardContent>
