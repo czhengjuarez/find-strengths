@@ -1,207 +1,103 @@
-// src/App.tsx
-
 import { useState } from "react";
-import { useLocalStorage } from "./hooks/useLocalStorage";
-import { Header } from "@/components/Header";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
-import jsPDF from 'jspdf';
-import { XCircle, PlusCircle } from "lucide-react";
+import { CapabilityInput } from "./components/CapabilityInput";
+import { RankingStep } from "./components/RankingStep";
+import { ResultsGrid } from "./components/ResultsGrid";
+import type { Capability, ProcessedCapability } from "./types";
 
-// --- Data Structure for the Checklist ---
-const checklistData = {
-  before: {
-    mainTitle: "Before the Meeting",
-    subsections: [
-      { id: "stakeholder-setup", title: "Stakeholder & Context Setup", items: [ "Identify key stakeholders (Design, PM, Eng, others)", "Define the core problem to be solved", "Draft a rough timeline or milestone expectations", "Clarify decision-makers and approvers" ] },
-      { id: "partner-research", title: "Partner Research & Preparation", items: [ "Understand partner priorities and constraints (what they're measured on, current capacity, competing priorities)", "Research any relevant history (past collaborations, known friction points, previous project outcomes)" ] }
-    ]
-  },
-  during: {
-    mainTitle: "During the Kickoff",
-    subsections: [
-      { id: "goals-alignment", title: "Goals & Success Alignment", items: [ "Agree on shared goals and success criteria", "Clarify roles and responsibilities (RACI if needed)", "Set quality standards or definition of done for each discipline", "Identify what \"done\" looks like overall" ] },
-      { id: "comm-process", title: "Communication & Process Setup", items: [ "Outline communication norms (sync vs async, update cadence)", "Define escalation paths (who to involve when decisions get stuck)", "Agree on change management process (how to handle scope/timeline changes)", "Establish a space for documentation (e.g. Confluence, Notion, Figma board)" ] },
-    ]
-  },
-  after: {
-    mainTitle: "After the Meeting",
-    subsections: [
-      { id: "doc-comm", title: "Documentation & Communication", items: [ "Summarize key decisions and next steps in writing", "Share meeting notes with all stakeholders", "Create shared project dashboard/tracker (not just documentation space, but progress visibility)" ] },
-      { id: "system-setup", title: "System Setup", items: [ "Add stakeholders to relevant tools/systems (Slack channels, project boards, etc.)", "Set a reminder to check on progress at key milestones" ] },
-      { id: "relationship-mgmt", title: "Ongoing Relationship Management", items: [ "Plan \"How's our collaboration going?\" checkpoint questions for ongoing projects" ] }
-    ]
-  },
-  quickReference: {
-    mainTitle: "Quick Reference: Key Questions to Answer",
-    items: [
-      { title: "Goals", question: "What are we trying to achieve and how will we know we succeeded?" },
-      { title: "Roles", question: "Who does what, and who makes final decisions?" },
-      { title: "Communication", question: "How often do we sync, and through what channels?" },
-      { title: "Dependencies", question: "What do we need from others, and what do others need from us?" },
-      { title: "Quality", question: "What does \"good enough\" vs \"excellent\" look like for each discipline?" },
-      { title: "Changes", question: "How do we handle scope creep or timeline shifts?" },
-      { title: "Escalation", question: "Who do we involve when we're stuck?" }
-    ]
-  }
-};
+type AppStep = "INPUT" | "RANK_ENJOYMENT" | "RANK_SKILL" | "RESULTS";
 
-interface ChecklistItem {
-  id: number;
-  text: string;
-  completed: boolean;
-}
+export default function App() { // <-- The 'default' keyword is added here
+  const [appStep, setAppStep] = useState<AppStep>("INPUT");
+  
+  const [capabilities, setCapabilities] = useState<Capability[]>([
+    { id: 1, text: "" }, { id: 2, text: "" }, { id: 3, text: "" },
+  ]);
 
-// --- Helper to create the initial state ---
-const getInitialState = () => {
-  const state: { [key: string]: ChecklistItem[] } = {};
-  Object.values(checklistData).forEach(section => {
-    if (section.subsections) {
-      section.subsections.forEach((subsection: any) => {
-        state[subsection.id] = subsection.items.map((itemText: string, index: number) => ({
-          id: Date.now() + Math.random() + index,
-          text: itemText,
-          completed: false
-        }));
-      });
+  const [enjoymentRanked, setEnjoymentRanked] = useState<Capability[]>([]);
+  const [skillRanked, setSkillRanked] = useState<Capability[]>([]);
+  const [finalResults, setFinalResults] = useState<ProcessedCapability[]>([]);
+  const [lastRankedCapabilities, setLastRankedCapabilities] = useState<Capability[]>([]);
+  
+  const handleStartRanking = () => {
+    const currentFilled = capabilities.filter(c => c.text.trim() !== '');
+    const currentIds = new Set(currentFilled.map(c => c.id));
+    const lastRankedIds = new Set(lastRankedCapabilities.map(c => c.id));
+    
+    const hasListChanged = currentIds.size !== lastRankedIds.size || 
+                           [...currentIds].some(id => !lastRankedIds.has(id));
+
+    if (hasListChanged) {
+      setEnjoymentRanked([]);
+      setSkillRanked([]);
     }
-  });
-  return state;
-};
-
-const ChecklistSection = ({ title, subsections, checklistItems, newItemTexts, handleToggle, handleDelete, handleAdd, handleTextChange }: any) => (
-  <Card>
-    <CardHeader>
-      <CardTitle className="text-2xl font-semibold text-gray-800">{title}</CardTitle>
-    </CardHeader>
-    <CardContent className="space-y-6">
-      {subsections.map((subsection: any) => (
-        <div key={subsection.id} className="border-t pt-4 first:border-t-0 first:pt-0">
-          <h3 className="text-lg font-semibold mb-3">{subsection.title}</h3>
-          <div className="space-y-2">
-            {(checklistItems[subsection.id] || []).map((item: ChecklistItem) => (
-              <div key={item.id} className="flex items-center space-x-3">
-                <Checkbox id={`${subsection.id}-${item.id}`} checked={item.completed} onCheckedChange={() => handleToggle(subsection.id, item.id)} />
-                <Label htmlFor={`${subsection.id}-${item.id}`} className={`flex-grow text-base font-normal ${item.completed ? 'line-through text-muted-foreground' : ''}`}>{item.text}</Label>
-                <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleDelete(subsection.id, item.id)}>
-                  <XCircle className="h-4 w-4 text-gray-400 hover:text-red-500" />
-                </Button>
-              </div>
-            ))}
-          </div>
-          <div className="flex items-center space-x-2 pt-3 mt-2">
-            <Input 
-              placeholder="Add your own item..." 
-              value={newItemTexts[subsection.id] || ""}
-              onChange={(e) => handleTextChange(subsection.id, e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleAdd(subsection.id)}
-            />
-            <Button onClick={() => handleAdd(subsection.id)} size="sm"><PlusCircle className="h-4 w-4 mr-2" />Add</Button>
-          </div>
-        </div>
-      ))}
-    </CardContent>
-  </Card>
-);
-
-
-export default function App() {
-  const [checklistItems, setChecklistItems] = useLocalStorage<{ [key: string]: ChecklistItem[] }>('xfnChecklistItems_v2', getInitialState());
-  const [newItemTexts, setNewItemTexts] = useState<{ [key: string]: string }>({});
-  const [isDownloading, setIsDownloading] = useState(false);
-
-  // --- Handlers ---
-  const handleToggle = (listId: string, itemId: number) => { setChecklistItems(prev => ({ ...prev, [listId]: prev[listId].map(item => item.id === itemId ? { ...item, completed: !item.completed } : item) })); };
-  const handleDelete = (listId: string, itemId: number) => { setChecklistItems(prev => ({ ...prev, [listId]: prev[listId].filter(item => item.id !== itemId) })); };
-  const handleAdd = (listId: string) => {
-    const text = newItemTexts[listId] || "";
-    if (text.trim() === "") return;
-    setChecklistItems(prev => ({ ...prev, [listId]: [...(prev[listId] || []), { id: Date.now(), text, completed: false }] }));
-    setNewItemTexts(prev => ({ ...prev, [listId]: "" }));
+    
+    setAppStep("RANK_ENJOYMENT");
   };
-  const handleTextChange = (listId: string, text: string) => { setNewItemTexts(prev => ({ ...prev, [listId]: text })); };
-  const handleReset = () => { if (window.confirm("Are you sure you want to reset the entire checklist?")) { setChecklistItems(getInitialState()); setNewItemTexts({}); } };
 
-  const handleDownloadPDF = () => {
-    setIsDownloading(true);
-    try {
-      const doc = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
-      let y = 15;
-      const margin = 15;
-      const maxWidth = doc.internal.pageSize.width - margin * 2;
-      const addPageIfNeeded = (spaceNeeded: number) => { if (y + spaceNeeded > doc.internal.pageSize.height - margin) { doc.addPage(); y = margin; } };
+  const handleEnjoymentRanked = (rankedCapabilities: Capability[]) => {
+    setEnjoymentRanked(rankedCapabilities);
+    setAppStep("RANK_SKILL");
+  };
 
-      doc.setFont("helvetica", "bold"); doc.setFontSize(22); doc.setTextColor("#8F1F57"); doc.text("XFN Kickoff Checklist", margin, y); y += 15;
+  const handleSkillRanked = (skillRankedCapabilities: Capability[]) => {
+    setSkillRanked(skillRankedCapabilities);
+    const filledCapabilities = capabilities.filter(c => c.text.trim() !== '');
+    setLastRankedCapabilities(filledCapabilities);
 
-      Object.values(checklistData).forEach(section => {
-        if (section.subsections) {
-          addPageIfNeeded(12);
-          doc.setFont("helvetica", "bold"); doc.setFontSize(18); doc.setTextColor("#000000"); doc.text(section.mainTitle, margin, y); y += 8;
-          section.subsections.forEach((subsection: any) => {
-            addPageIfNeeded(10);
-            doc.setFont("helvetica", "bold"); doc.setFontSize(14); doc.text(subsection.title, margin, y); y += 6;
-            doc.setFont("helvetica", "normal"); doc.setFontSize(11);
-            const items = checklistItems[subsection.id] || [];
-            if (items.length > 0) {
-              items.forEach(item => {
-                const itemStatus = item.completed ? '[x]' : '[ ]';
-                const itemLines = doc.splitTextToSize(item.text, maxWidth - 10);
-                addPageIfNeeded(itemLines.length * 5 + 2);
-                doc.text(`${itemStatus} ${itemLines[0]}`, margin + 5, y);
-                if (itemLines.length > 1) { doc.text(itemLines.slice(1), margin + 11, y + 5); y += (itemLines.length - 1) * 5; }
-                y += 5;
-              });
-            }
-            y += 4;
-          });
-        }
-      });
+    const results: ProcessedCapability[] = filledCapabilities.map(cap => {
+      const enjoymentList = enjoymentRanked.length > 0 ? enjoymentRanked : filledCapabilities;
+      const enjoymentRank = enjoymentList.findIndex(item => item.id === cap.id);
+      const skillRank = skillRankedCapabilities.findIndex(item => item.id === cap.id);
+      return { ...cap, enjoymentRank, skillRank };
+    });
+    setFinalResults(results);
+    setAppStep("RESULTS");
+  };
 
-      doc.save(`xfn-kickoff-checklist-${new Date().toISOString().split('T')[0]}.pdf`);
-    } catch (error) {
-      console.error("Error generating PDF:", error);
-    } finally {
-      setIsDownloading(false);
-    }
+  const handleEdit = () => {
+    setAppStep("INPUT");
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 text-slate-800">
-      <Header onDownloadPDF={handleDownloadPDF} isDownloading={isDownloading} onReset={handleReset} />
-      <main className="container mx-auto max-w-7xl pt-24 pb-12 px-4">
-        <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-gray-900">Cross-Functional Kickoff Checklist</h1>
-          <p className="mt-2 text-lg text-muted-foreground">Use this checklist to align with a cross-functional partner before starting a shared initiative.</p>
+    <div className="min-h-screen bg-gray-50 text-slate-800 flex items-center justify-center p-4">
+      <main className="container mx-auto max-w-5xl">
+        <div className="mb-6">
+          <p style={{ fontSize: '1.08em', textAlign: 'center' }}>
+            Use this template to find your strength. To understand the method and reason behind this interactive activity,{' '}
+            <a href="https://changying.substack.com/p/performance-and-growth-a-smarter" target="_blank" rel="noopener noreferrer"><b>READ HERE</b></a>.
+          </p>
         </div>
+        {appStep === "INPUT" && (
+          <CapabilityInput 
+            capabilities={capabilities}
+            setCapabilities={setCapabilities}
+            onNext={handleStartRanking} 
+          />
+        )}
+        
+        {appStep === "RANK_ENJOYMENT" && (
+          <RankingStep 
+            capabilities={enjoymentRanked.length > 0 ? enjoymentRanked : capabilities.filter(c => c.text.trim() !== '')} 
+            onNext={handleEnjoymentRanked} 
+            title="Rank by Enjoyment" 
+            highLabel="Most Enjoy" 
+            lowLabel="Least Enjoy" 
+            direction="vertical" 
+          />
+        )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
-          {/* Column 1 */}
-          <ChecklistSection title={checklistData.before.mainTitle} subsections={checklistData.before.subsections} {...{ checklistItems, newItemTexts, handleToggle, handleDelete, handleAdd, handleTextChange }} />
-          
-          {/* Column 2 */}
-          <ChecklistSection title={checklistData.during.mainTitle} subsections={checklistData.during.subsections} {...{ checklistItems, newItemTexts, handleToggle, handleDelete, handleAdd, handleTextChange }} />
-          
-          {/* Column 3 */}
-          <ChecklistSection title={checklistData.after.mainTitle} subsections={checklistData.after.subsections} {...{ checklistItems, newItemTexts, handleToggle, handleDelete, handleAdd, handleTextChange }} />
-        </div>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-2xl font-semibold text-gray-800">{checklistData.quickReference.mainTitle}</CardTitle>
-          </CardHeader>
-          <CardContent className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {checklistData.quickReference.items.map((item: any) => (
-              <div key={item.title} className="p-4 border rounded-lg bg-gray-50/50">
-                {/* UPDATED: Changed text-primary to text-gray-900 */}
-                <h3 className="font-semibold text-gray-900">{item.title}:</h3>
-                <p className="text-muted-foreground mt-1">{item.question}</p>
-              </div>
-            ))}
-          </CardContent>
-        </Card>
+        {appStep === "RANK_SKILL" && (
+          <RankingStep 
+            capabilities={skillRanked.length > 0 ? skillRanked : capabilities.filter(c => c.text.trim() !== '')} 
+            onNext={handleSkillRanked} 
+            title="Rank by Skill" 
+            highLabel="You are good at" 
+            lowLabel="You are not good at" 
+            direction="horizontal" 
+          />
+        )}
+        
+        {appStep === "RESULTS" && <ResultsGrid results={finalResults} onEdit={handleEdit} />}
       </main>
     </div>
   );
