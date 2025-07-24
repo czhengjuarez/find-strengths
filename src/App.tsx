@@ -166,10 +166,10 @@ useEffect(() => { fetchCommunityEntries(); }, []);
            >
              <div className="flex flex-col gap-6 md:flex-row md:gap-8">
                {/* My List and Capability Columns */}
-                <div className="flex-1 w-full" style={{ maxWidth: '60%' }}>
+                <div className="flex-1 w-full md:w-1/2">
                   <div className="border-2 border-dashed border-gray-300 rounded-lg bg-white p-4 min-h-[260px] flex flex-row gap-8 overflow-x-auto">
                    {/* My List Column */}
-                   <div className="flex-[0.6] flex flex-col min-w-0">
+                   <div className="w-2/5 flex flex-col min-w-0">
                      <h2 className="text-lg font-semibold mb-2">My List</h2>
                      <div className="grid gap-2 mb-4 flex-1">
                        {userEntries.map((entry) => (
@@ -195,17 +195,20 @@ useEffect(() => { fetchCommunityEntries(); }, []);
                      </div>
                    </div>
                    {/* Capability Column */}
-                   <div className="flex-[1.4] flex flex-col min-w-0">
+                   <div className="w-3/5 flex flex-col min-w-0">
                      <div className="flex items-center mb-2 gap-2">
                        <h2 className="text-lg font-semibold">Capability</h2>
                        <select
-                         className="border rounded px-2 py-1 text-sm"
+                         className="border rounded px-2 py-1 text-sm max-w-40 truncate"
                          value={selectedCommunityCategory}
                          onChange={e => setSelectedCommunityCategory(e.target.value)}
+                         title={selectedCommunityCategory || "All Categories"}
                        >
                          <option value="">All Categories</option>
                          {uniqueCommunityCategories.map(cat => (
-                           <option key={cat} value={cat}>{cat}</option>
+                           <option key={cat} value={cat} title={cat}>
+                             {cat.length > 20 ? `${cat.substring(0, 20)}...` : cat}
+                           </option>
                          ))}
                        </select>
                      </div>
