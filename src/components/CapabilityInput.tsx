@@ -10,9 +10,10 @@ interface Props {
   capabilities: Capability[];
   setCapabilities: React.Dispatch<React.SetStateAction<Capability[]>>;
   onNext: () => void;
+  onSave?: () => void;
 }
 
-export function CapabilityInput({ capabilities, setCapabilities, onNext }: Props) {
+export function CapabilityInput({ capabilities, setCapabilities, onNext, onSave }: Props) {
   // The local state for the capabilities list has been removed.
 
   const handleTextChange = (id: number, newText: string) => {
@@ -55,12 +56,17 @@ export function CapabilityInput({ capabilities, setCapabilities, onNext }: Props
             </div>
           ))}
         </div>
-        <div className="flex justify-between items-center pt-4">
-          <Button variant="outline" onClick={addCapability}>Add Row</Button>
-          <Button onClick={onNext} disabled={filledCapabilities.length === 0}>
-            Next: Rank Enjoyment <ArrowRight className="h-4 w-4 ml-2" />
-          </Button>
-        </div>
+        <div className="flex gap-2 pt-4 w-full">
+  <Button variant="secondary" onClick={addCapability}>Add Row</Button>
+  {onSave && (
+    <Button variant="secondary" onClick={onSave}>
+      Save to your list
+    </Button>
+  )}
+  <Button onClick={onNext} disabled={filledCapabilities.length === 0}>
+    Rank <ArrowRight className="h-4 w-4 ml-2" />
+  </Button>
+</div>
         <p className="text-sm text-muted-foreground text-right">{capabilities.length} capabilities</p>
       </CardContent>
     </Card>

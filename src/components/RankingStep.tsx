@@ -76,7 +76,7 @@ export function RankingStep({ capabilities, onNext, title, highLabel, lowLabel, 
         </div>
         <div className="flex justify-end pt-6">
           <Button onClick={() => onNext(items)}>
-            {direction === 'vertical' ? 'Next: Rank Skill' : 'Show Results'} <ArrowRight className="h-4 w-4 ml-2" />
+            {direction === 'vertical' ? 'Rank Skill' : 'Show Results'} <ArrowRight className="h-4 w-4 ml-2" />
           </Button>
         </div>
       </CardContent>

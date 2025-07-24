@@ -1,6 +1,12 @@
 name = "find-your-strengths-worker"
-main = "src/worker.ts"
-compatibility_date = "2024-01-01"
+main = "src/index.ts"
+compatibility_date = "2024-01-01" # Consider updating this to a more recent date like "2025-07-24" for latest features
 
 [site]
 bucket = "./dist"
+fallback = "index.html" # <--- ADD THIS LINE!
+
+[[d1_databases]]
+binding = "DB"
+database_name = "find-strengths"
+database_id = "8cd76b9c-d506-4b36-9908-5baf1bf07cb4"
