@@ -7,11 +7,16 @@ import { Accordion, AccordionItem } from "./components/ui/accordion";
 import { Trash2 } from "lucide-react";
 import { RankingStep } from "./components/RankingStep";
 import { ResultsGrid } from "./components/ResultsGrid";
+import { Header } from "./components/Header";
+import { LoginModal } from "./components/LoginModal";
+import { GoogleOAuthCallback } from "./components/GoogleOAuthCallback";
+import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import type { Capability, ProcessedCapability } from "./typs";
 
 type AppStep = "INPUT" | "RANK_ENJOYMENT" | "RANK_SKILL" | "RESULTS";
 
-export default function App() {
+function AppContent() {
+  const { login } = useAuth();
   // Community filter for INPUT step
   const [selectedCommunityCategory, setSelectedCommunityCategory] = useState<string>("");
 
@@ -37,6 +42,7 @@ export default function App() {
   const [userEntryToDelete, setUserEntryToDelete] = useState<{id: number, content: string} | null>(null);
   const [inputCategory, setInputCategory] = useState("");
   const [inputCapability, setInputCapability] = useState("");
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
 const handleCommunitySubmit = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -135,9 +141,35 @@ useEffect(() => { fetchCommunityEntries(); }, []);
     setAppStep("INPUT");
   };
 
+  const handleSignInClick = () => {
+    setShowLoginModal(true);
+  };
+
+  const handleLoginSuccess = (user: any, token: string) => {
+    login(user, token);
+    setShowLoginModal(false);
+  };
+
+  // Check if this is a Google OAuth callback
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('token') && urlParams.get('user')) {
+      // This is a Google OAuth callback, render the callback component
+      return;
+    }
+  }, []);
+
+  // Handle Google OAuth callback
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('token') && urlParams.get('user')) {
+    return <GoogleOAuthCallback />;
+  }
+
   return (
-    <div className="min-h-screen bg-gray-50 text-slate-800 flex items-center justify-center p-4">
-      <main className="container mx-auto max-w-5xl">
+    <div className="min-h-screen bg-gray-50 text-slate-800">
+      <Header onSignInClick={handleSignInClick} />
+      <div className="flex items-center justify-center p-4 pt-8">
+        <main className="container mx-auto max-w-5xl">
         <div className="mb-6">
           <p style={{ fontSize: '1.08em', textAlign: 'center' }}>
             Use this template to find your strength. To understand the method and reason behind this interactive activity,{' '}
@@ -441,5 +473,20 @@ useEffect(() => { fetchCommunityEntries(); }, []);
           </section>
         </main>
       </div>
+      
+      <LoginModal 
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+        onLoginSuccess={handleLoginSuccess}
+      />
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }
