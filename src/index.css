@@ -47,3 +47,14 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* Custom class for word breaking with hyphens */
+.break-words-with-hyphens {
+  word-break: break-all;
+  hyphens: auto;
+  -webkit-hyphens: auto;
+  -moz-hyphens: auto;
+  -ms-hyphens: auto;
+  hyphenate-character: '-';
+  overflow-wrap: break-word;
+}

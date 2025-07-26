@@ -25,6 +25,13 @@ console.log('Google OAuth Credentials:');
 console.log('Client ID:', GOOGLE_CLIENT_ID);
 console.log('Client Secret:', GOOGLE_CLIENT_SECRET ? 'GOCSPX-***' : 'NOT SET');
 
+// Config endpoint to provide Google Client ID to frontend
+app.get('/auth/config', (req, res) => {
+  res.json({
+    googleClientId: GOOGLE_CLIENT_ID
+  });
+});
+
 app.use(cors());
 app.use(bodyParser.json());
 

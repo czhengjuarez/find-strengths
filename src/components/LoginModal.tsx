@@ -53,16 +53,28 @@ export const LoginModal: React.FC<LoginModalProps> = ({ isOpen, onClose, onLogin
     }
   };
 
-  const handleGoogleAuth = () => {
-    // Redirect to Google OAuth
-    // Note: Client ID should be configured via environment variables on the backend
-    const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-      `client_id=${process.env.REACT_APP_GOOGLE_CLIENT_ID || 'GOOGLE_CLIENT_ID_NOT_SET'}&` +
-      `redirect_uri=${encodeURIComponent(window.location.origin + '/auth/google/callback')}&` +
-      `response_type=code&` +
-      `scope=email profile`;
-    
-    window.location.href = googleAuthUrl;
+  const handleGoogleAuth = async () => {
+    try {
+      // Fetch Google Client ID from backend config
+      const configResponse = await fetch('/auth/config');
+      const config = await configResponse.json();
+      
+      if (!config.googleClientId) {
+        setError('Google OAuth is not configured');
+        return;
+      }
+      
+      // Redirect to Google OAuth
+      const googleAuthUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+        `client_id=${config.googleClientId}&` +
+        `redirect_uri=${encodeURIComponent(window.location.origin + '/auth/google/callback')}&` +
+        `response_type=code&` +
+        `scope=email profile`;
+      
+      window.location.href = googleAuthUrl;
+    } catch (error) {
+      setError('Failed to initialize Google OAuth');
+    }
   };
 
   if (!isOpen) return null;

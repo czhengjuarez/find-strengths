@@ -6,7 +6,31 @@ const app = new Hono()
 // --- API ROUTES FIRST ---
 app.get('/entries', async (c) => {
   try {
-    const { results } = await c.env.DB.prepare('SELECT * FROM entries').all();
+    // Check for user authentication
+    const authHeader = c.req.header('Authorization');
+    let userId = null;
+    
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      try {
+        const token = authHeader.substring(7);
+        // Simple JWT decode for user ID (in production, verify signature)
+        const payload = JSON.parse(atob(token.split('.')[1]));
+        userId = payload.userId;
+      } catch (e) {
+        // Invalid token, treat as guest
+      }
+    }
+    
+    let query;
+    if (userId) {
+      // Return user-specific entries
+      query = c.env.DB.prepare('SELECT * FROM entries WHERE user_id = ? ORDER BY created_at DESC').bind(userId);
+    } else {
+      // Return empty array for guests (no persistent storage)
+      return c.json([]);
+    }
+    
+    const { results } = await query.all();
     return c.json(results || []);
   } catch (e) {
     // Optionally log error: console.error(e);
@@ -17,7 +41,29 @@ app.get('/entries', async (c) => {
 app.post('/entries', async (c) => {
   const { content } = await c.req.json();
   if (!content) return c.text('Content is required', 400);
-  await c.env.DB.prepare('INSERT INTO entries (content) VALUES (?)').bind(content).run();
+  
+  // Check for user authentication
+  const authHeader = c.req.header('Authorization');
+  let userId = null;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.substring(7);
+      // Simple JWT decode for user ID (in production, verify signature)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      userId = payload.userId;
+    } catch (e) {
+      // Invalid token, treat as guest
+    }
+  }
+  
+  if (!userId) {
+    // Don't save entries for guest users
+    return c.text('Entry created! (guest mode - not saved)', 201);
+  }
+  
+  // Save entry for logged-in user
+  await (c.env as any).DB.prepare('INSERT INTO entries (content, user_id) VALUES (?, ?)').bind(content, userId).run();
   return c.text('Entry created!', 201);
 });
 
@@ -38,7 +84,28 @@ app.get('/community-entries', async (c) => {
 // Delete a user entry by id
 app.delete('/entries/:id', async (c) => {
   const id = c.req.param('id');
-  await c.env.DB.prepare('DELETE FROM entries WHERE id = ?').bind(id).run();
+  
+  // Check for user authentication
+  const authHeader = c.req.header('Authorization');
+  let userId = null;
+  
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    try {
+      const token = authHeader.substring(7);
+      // Simple JWT decode for user ID (in production, verify signature)
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      userId = payload.userId;
+    } catch (e) {
+      // Invalid token, treat as guest
+    }
+  }
+  
+  if (!userId) {
+    return c.text('Authentication required', 401);
+  }
+  
+  // Only allow users to delete their own entries
+  await (c.env as any).DB.prepare('DELETE FROM entries WHERE id = ? AND user_id = ?').bind(id, userId).run();
   return c.text('Entry deleted', 200);
 });
 

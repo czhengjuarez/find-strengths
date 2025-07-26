@@ -18,6 +18,7 @@ export default defineConfig({
     port: 3001,
     proxy: {
       '/auth': 'http://localhost:4000',
+      '/entries': 'http://localhost:4000',
     },
   },
   build: {

@@ -10,13 +10,14 @@ import { ResultsGrid } from "./components/ResultsGrid";
 import { Header } from "./components/Header";
 import { LoginModal } from "./components/LoginModal";
 import { GoogleOAuthCallback } from "./components/GoogleOAuthCallback";
+import { GuestSaveModal } from "./components/GuestSaveModal";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import type { Capability, ProcessedCapability } from "./typs";
 
 type AppStep = "INPUT" | "RANK_ENJOYMENT" | "RANK_SKILL" | "RESULTS";
 
 function AppContent() {
-  const { login } = useAuth();
+  const { login, user, token, isAuthenticated } = useAuth();
   // Community filter for INPUT step
   const [selectedCommunityCategory, setSelectedCommunityCategory] = useState<string>("");
 
@@ -43,6 +44,9 @@ function AppContent() {
   const [inputCategory, setInputCategory] = useState("");
   const [inputCapability, setInputCapability] = useState("");
   const [showLoginModal, setShowLoginModal] = useState(false);
+  const [showGuestSaveModal, setShowGuestSaveModal] = useState(false);
+  const [pendingCapabilities, setPendingCapabilities] = useState<Capability[]>([]);
+  const [saveNotification, setSaveNotification] = useState<string | null>(null);
 
 const handleCommunitySubmit = async (e: React.FormEvent) => {
   e.preventDefault();
@@ -63,21 +67,146 @@ const handleCommunitySubmit = async (e: React.FormEvent) => {
   }
 };
 
-// Fetch user entries from backend on mount
-useEffect(() => {
+// Fetch user entries - user-specific for logged-in users, empty for guests
+const fetchUserEntries = async () => {
   setUserEntriesLoading(true);
-  fetch('/entries')
-    .then((res) => {
-      if (!res.ok) throw new Error('Failed to fetch user entries');
-      return res.json();
+  setUserEntriesError(null);
+  
+  try {
+    if (!isAuthenticated || !token) {
+      // Clear entries for guest users
+      setUserEntries([]);
+      return;
+    }
+    
+    // Fetch user-specific entries for logged-in users
+    const response = await fetch('/entries', {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch user entries');
+    }
+    
+    const data = await response.json();
+    setUserEntries(data);
+  } catch (err: any) {
+    setUserEntriesError(err.message);
+    setUserEntries([]);
+  } finally {
+    setUserEntriesLoading(false);
+  }
+};
+
+// Load user entries when authentication state changes
+useEffect(() => {
+  fetchUserEntries();
+}, [isAuthenticated, token]);
+
+// Helper function to save capabilities to authenticated user's account
+const saveCapabilitiesToAccount = async (caps: Capability[]) => {
+  if (!token) return;
+  
+  // First, deduplicate the capabilities being saved (case-insensitive)
+  const uniqueCapabilities = caps
+    .filter(cap => cap.text.trim())
+    .reduce((unique: Capability[], cap) => {
+      const content = cap.text.trim();
+      const isDuplicateInBatch = unique.some(existingCap => 
+        existingCap.text.trim().toLowerCase() === content.toLowerCase()
+      );
+      if (!isDuplicateInBatch) {
+        unique.push({ ...cap, text: content });
+      }
+      return unique;
+    }, []);
+  
+  let newEntriesCount = 0;
+  
+  for (const cap of uniqueCapabilities) {
+    const content = cap.text;
+    // Check if this content already exists in user's list
+    const isDuplicate = userEntries.some(entry => 
+      entry.content.toLowerCase() === content.toLowerCase()
+    );
+    
+    if (!isDuplicate) {
+      await fetch('/entries', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ content }),
+      });
+      newEntriesCount++;
+    }
+  }
+  
+  // Show notification if no new entries were added
+  if (newEntriesCount === 0 && caps.some(cap => cap.text.trim())) {
+    setSaveNotification('No new entries to add');
+    setTimeout(() => setSaveNotification(null), 3000);
+  }
+  
+  // Refresh user entries after saving
+  await fetchUserEntries();
+};
+
+// Handle guest save modal actions
+const handleGuestSignIn = () => {
+  setShowGuestSaveModal(false);
+  setShowLoginModal(true);
+};
+
+const handleGuestProceed = () => {
+  // For guest users, save pending capabilities to local "My List" for the session
+  
+  // First, deduplicate the capabilities being saved (case-insensitive)
+  const uniqueCapabilities = pendingCapabilities
+    .filter(cap => cap.text.trim())
+    .reduce((unique: Capability[], cap) => {
+      const content = cap.text.trim();
+      const isDuplicateInBatch = unique.some(existingCap => 
+        existingCap.text.trim().toLowerCase() === content.toLowerCase()
+      );
+      if (!isDuplicateInBatch) {
+        unique.push({ ...cap, text: content });
+      }
+      return unique;
+    }, []);
+  
+  const newEntries = uniqueCapabilities
+    .filter(cap => {
+      // Check if this content already exists in user's list (case-insensitive)
+      const content = cap.text;
+      return !userEntries.some(entry => 
+        entry.content.toLowerCase() === content.toLowerCase()
+      );
     })
-    .then((data) => {
-      setUserEntries(data);
-      setUserEntriesError(null);
-    })
-    .catch((err) => setUserEntriesError(err.message))
-    .finally(() => setUserEntriesLoading(false));
-}, []);
+    .map((cap, index) => ({
+      id: Date.now() + index, // Generate temporary integer ID for guest entries
+      content: cap.text
+    }));
+  
+  // Show notification if no new entries were added
+  if (newEntries.length === 0 && uniqueCapabilities.length > 0) {
+    setSaveNotification('No new entries to add');
+    setTimeout(() => setSaveNotification(null), 3000);
+  }
+  
+  // Add to existing user entries (for session-based storage)
+  setUserEntries(prevEntries => [...prevEntries, ...newEntries]);
+  
+  // Clear pending capabilities and close modal
+  setPendingCapabilities([]);
+  setShowGuestSaveModal(false);
+  
+  console.log('Guest saved capabilities to local session:', newEntries);
+};
 
 // Fetch community entries from backend on mount
 const fetchCommunityEntries = () => {
@@ -204,26 +333,26 @@ useEffect(() => { fetchCommunityEntries(); }, []);
                    <div className="w-2/5 flex flex-col min-w-0">
                      <h2 className="text-lg font-semibold mb-2">My List</h2>
                      <div className="grid gap-2 mb-4 flex-1">
-                       {userEntries.map((entry) => (
-                         <div
-                           key={entry.id}
-                           id={`mylist:${entry.id}`}
-                           style={{ cursor: 'grab' }}
-                           {...{ draggable: true, onDragStart: (e) => { e.dataTransfer.setData('text/plain', `mylist:${entry.id}`); } }}
-                           className="border rounded px-2 py-1 bg-gray-50 flex items-center text-sm"
-                         >
-                           <span className="text-gray-800 flex-1">{entry.content}</span>
-                           <button
-                             className="ml-2 p-1 rounded hover:bg-red-100"
-                             title="Delete"
-                             onClick={() => setUserEntryToDelete(entry)}
-                           >
-                             <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 hover:text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                             </svg>
-                           </button>
-                         </div>
-                       ))}
+                        {userEntries.map((entry) => (
+                          <div
+                            key={entry.id}
+                            id={`mylist:${entry.id}`}
+                            style={{ cursor: 'grab' }}
+                            {...{ draggable: true, onDragStart: (e) => { e.dataTransfer.setData('text/plain', `mylist:${entry.id}`); } }}
+                            className="border rounded px-2 py-1 bg-gray-50 flex items-center text-sm w-full max-w-full overflow-hidden"
+                          >
+                            <span className="text-gray-800 flex-1 break-words-with-hyphens">{entry.content}</span>
+                            <button
+                              className="ml-2 p-1 rounded hover:bg-red-100"
+                              title="Delete"
+                              onClick={() => setUserEntryToDelete(entry)}
+                            >
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 hover:text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
                      </div>
                    </div>
                    {/* Capability Column */}
@@ -290,24 +419,23 @@ useEffect(() => { fetchCommunityEntries(); }, []);
                      setCapabilities={setCapabilities}
                      onNext={handleStartRanking}
                      onSave={async () => {
-                       for (const cap of capabilities) {
-                         if (cap.text.trim()) {
-                           await fetch('/entries', {
-                             method: 'POST',
-                             headers: { 'Content-Type': 'application/json' },
-                             body: JSON.stringify({ content: cap.text.trim() }),
-                           });
-                         }
+                       if (!isAuthenticated || !token) {
+                         // Show guest save modal instead of alert
+                         setPendingCapabilities(capabilities.filter(cap => cap.text.trim()));
+                         setShowGuestSaveModal(true);
+                         return;
                        }
-                       // Refresh user entries after saving
-                       setUserEntriesLoading(true);
-                       fetch('/entries')
-                         .then((res) => res.json())
-                         .then((data) => setUserEntries(data))
-                         .finally(() => setUserEntriesLoading(false));
+                       
+                       // Save for authenticated users
+                       await saveCapabilitiesToAccount(capabilities);
                      }}
-                   />
-                   <div className="text-xs text-gray-400 mt-2">Drag from My list or Capability list to add here</div>
+                    />
+                    {saveNotification && (
+                      <div className="mt-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-sm text-amber-700 animate-fade-in">
+                        {saveNotification}
+                      </div>
+                    )}
+                    <div className="text-xs text-gray-400 mt-2">Drag from My list or Capability list to add here</div>
                  </div>
                </div>
              </div>
@@ -350,13 +478,22 @@ useEffect(() => { fetchCommunityEntries(); }, []);
           cancelLabel="Cancel"
           onConfirm={async () => {
             if (userEntryToDelete) {
-              await fetch(`/entries/${userEntryToDelete.id}`, { method: 'DELETE' });
+              if (token) {
+                // Authenticated user - delete from backend
+                await fetch(`/entries/${userEntryToDelete.id}`, { 
+                  method: 'DELETE',
+                  headers: {
+                    'Authorization': `Bearer ${token}`
+                  }
+                });
+                await fetchUserEntries();
+              } else {
+                // Guest user - delete from local state
+                setUserEntries(prevEntries => 
+                  prevEntries.filter(entry => entry.id !== userEntryToDelete.id)
+                );
+              }
               setUserEntryToDelete(null);
-              setUserEntriesLoading(true);
-              fetch('/entries')
-                .then((res) => res.json())
-                .then((data) => setUserEntries(data))
-                .finally(() => setUserEntriesLoading(false));
             }
           }}
           onCancel={() => setUserEntryToDelete(null)}
@@ -478,6 +615,13 @@ useEffect(() => { fetchCommunityEntries(); }, []);
         isOpen={showLoginModal}
         onClose={() => setShowLoginModal(false)}
         onLoginSuccess={handleLoginSuccess}
+      />
+      
+      <GuestSaveModal
+        isOpen={showGuestSaveModal}
+        onClose={() => setShowGuestSaveModal(false)}
+        onSignIn={handleGuestSignIn}
+        onProceedAsGuest={handleGuestProceed}
       />
     </div>
   );
