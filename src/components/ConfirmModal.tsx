@@ -3,7 +3,7 @@ import React from "react";
 interface ConfirmModalProps {
   open: boolean;
   title: string;
-  message: string;
+  message: string | React.ReactNode;
   confirmLabel?: string;
   cancelLabel?: string;
   onConfirm: () => void;
@@ -21,7 +21,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
 }) => {
   if (!open) return null;
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-40 z-50 flex items-center justify-center">
+    <div className="fixed inset-0 bg-black bg-opacity-40 z-[9999] flex justify-center pt-20">
       <div className="bg-white rounded-lg shadow-lg p-6 max-w-sm w-full">
         <h2 className="text-lg font-bold mb-2">{title}</h2>
         <p className="mb-4">{message}</p>

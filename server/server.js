@@ -237,6 +237,25 @@ app.get('/auth/google/callback', async (req, res) => {
   }
 });
 
+// Delete user account and all associated data
+app.delete('/auth/delete-account', authenticateToken, async (req, res) => {
+  try {
+    const db = await openDb();
+    const userId = req.user.id;
+    
+    // Delete user's personal entries (will cascade due to foreign key)
+    await db.run('DELETE FROM user_entries WHERE user_id = ?', [userId]);
+    
+    // Delete the user account
+    await db.run('DELETE FROM users WHERE id = ?', [userId]);
+    
+    res.json({ message: 'Account deleted successfully' });
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
 // === USER ENTRIES ENDPOINTS ===
 
 // Get user's personal entries
