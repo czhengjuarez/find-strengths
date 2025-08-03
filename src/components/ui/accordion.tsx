@@ -52,16 +52,26 @@ interface AccordionProps {
   children: React.ReactNode;
   allowMultiple?: boolean;
   forceOpenItems?: Set<number>; // External control for forcing items open
+  onForceOpenClear?: (index: number) => void; // Callback when user tries to close a force-opened item - FIXED v2
 }
 
 export const Accordion: React.FC<AccordionProps> = ({ 
   children, 
   allowMultiple = false,
-  forceOpenItems
+  forceOpenItems,
+  onForceOpenClear
 }) => {
   const [openItems, setOpenItems] = useState<Set<number>>(new Set());
 
   const handleToggle = (index: number) => {
+    const isForceOpen = forceOpenItems?.has(index) || false;
+    
+    // If this item is force-opened and user is trying to close it, call the callback
+    if (isForceOpen && onForceOpenClear) {
+      onForceOpenClear(index);
+      return;
+    }
+    
     if (allowMultiple) {
       const newOpenItems = new Set(openItems);
       if (newOpenItems.has(index)) {

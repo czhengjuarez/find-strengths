@@ -60,22 +60,79 @@ const normalizeCategory = (input: string): string => {
   const trimmed = input.trim();
   if (!trimmed) return trimmed;
   
-  // Create properly capitalized version
-  const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+  // Convert to proper Title Case (capitalize major words, keep minor words lowercase)
+  const minorWords = ['a', 'an', 'and', 'as', 'at', 'but', 'by', 'for', 'if', 'in', 'nor', 'of', 'on', 'or', 'so', 'the', 'to', 'up', 'yet'];
+  
+  const titleCase = trimmed.toLowerCase().split(' ').map((word, index) => {
+    // Always capitalize the first word, or if it's not a minor word
+    if (index === 0 || !minorWords.includes(word)) {
+      return word.charAt(0).toUpperCase() + word.slice(1);
+    }
+    return word; // Keep minor words lowercase (except first word)
+  }).join(' ');
   
   // Check if a category with same name (case-insensitive) already exists
   const existingCategory = communityEntries.find(entry => 
     entry.category.toLowerCase() === trimmed.toLowerCase()
   );
   
-  // Return existing capitalized version if found, otherwise return new capitalized version
-  return existingCategory ? existingCategory.category : capitalized;
+  // If existing category found, return it with proper Title Case formatting
+  // If no existing category, return the new Title Case version
+  if (existingCategory) {
+    // Apply Title Case to existing category to ensure consistency
+    const existingTitleCase = existingCategory.category.toLowerCase().split(' ').map((word, index) => {
+      if (index === 0 || !minorWords.includes(word)) {
+        return word.charAt(0).toUpperCase() + word.slice(1);
+      }
+      return word;
+    }).join(' ');
+    return existingTitleCase;
+  }
+  
+  return titleCase;
+};
+
+const normalizeCapability = (input: string): string => {
+  const trimmed = input.trim();
+  if (!trimmed) return trimmed;
+  
+  // Convert to title case (first letter of each word capitalized)
+  const titleCase = trimmed.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+  
+  // Check if a capability with same name (case-insensitive) already exists
+  const existingCapability = communityEntries.find(entry => 
+    entry.capability.toLowerCase() === trimmed.toLowerCase()
+  );
+  
+  // If existing capability found, ensure it's properly formatted in title case
+  // If no existing capability, return the new title case version
+  if (existingCapability) {
+    // Return the existing capability but ensure proper title case formatting
+    const existingTitleCase = existingCapability.capability.toLowerCase().replace(/\b\w/g, l => l.toUpperCase());
+    return existingTitleCase;
+  }
+  
+  return titleCase;
 };
 
 const handleCommunitySubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   if (inputCategory.trim() && inputCapability.trim()) {
     const normalizedCategory = normalizeCategory(inputCategory);
+    const normalizedCapability = normalizeCapability(inputCapability);
+    
+    // Check if this capability already exists in the same category
+    const duplicateInCategory = communityEntries.find(entry => 
+      entry.category.toLowerCase() === normalizedCategory.toLowerCase() &&
+      entry.capability.toLowerCase() === normalizedCapability.toLowerCase()
+    );
+    
+    if (duplicateInCategory) {
+      // Capability already exists in this category, don't add duplicate
+      setInputCategory("");
+      setInputCapability("");
+      return;
+    }
     
     // Send to backend
     await fetch('/community-entries', {
@@ -83,7 +140,7 @@ const handleCommunitySubmit = async (e: React.FormEvent) => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         category: normalizedCategory,
-        capability: inputCapability.trim(),
+        capability: normalizedCapability,
       })
     });
     // Fetch updated entries from backend and await it
@@ -100,6 +157,7 @@ const handleCategoryEdit = async (oldCategory: string, newCategory: string) => {
   if (!normalizedNewCategory.trim() || normalizedNewCategory === oldCategory) {
     setCategoryToEdit(null);
     setEditingCategoryName("");
+    setForceOpenAccordion(null); // Fix: Clear force-open state when saving without changes
     return;
   }
   
@@ -159,11 +217,33 @@ const handleCapabilityEdit = async (entryId: number, newText: string) => {
     return;
   }
   
+  const normalizedCapability = normalizeCapability(trimmedText);
+  
+  // Find the current entry being edited to get its category
+  const currentEntry = communityEntries.find(entry => entry.id === entryId);
+  if (!currentEntry) {
+    cancelEditingCapability();
+    return;
+  }
+  
+  // Check if this capability already exists in the same category (excluding the current entry)
+  const duplicateInCategory = communityEntries.find(entry => 
+    entry.id !== entryId && // Exclude the current entry being edited
+    entry.category.toLowerCase() === currentEntry.category.toLowerCase() &&
+    entry.capability.toLowerCase() === normalizedCapability.toLowerCase()
+  );
+  
+  if (duplicateInCategory) {
+    // Capability already exists in this category, cancel edit
+    cancelEditingCapability();
+    return;
+  }
+  
   try {
     const response = await fetch(`/community-entries/${entryId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ capability: trimmedText })
+      body: JSON.stringify({ capability: normalizedCapability })
     });
     
     if (!response.ok) {
@@ -323,8 +403,6 @@ const handleGuestProceed = () => {
   // Clear pending capabilities and close modal
   setPendingCapabilities([]);
   setShowGuestSaveModal(false);
-  
-  console.log('Guest saved capabilities to local session:', newEntries);
 };
 
 // Fetch community entries from backend on mount
@@ -346,7 +424,18 @@ useEffect(() => { fetchCommunityEntries(); }, []);
   // For INPUT step Community filter
   const uniqueCommunityCategories = Array.from(new Set(communityEntries.map(entry => entry.category))).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
   const filteredCommunityEntries = selectedCommunityCategory === "all"
-    ? communityEntries
+    ? (() => {
+        // For "All Categories" view, deduplicate capabilities and sort alphabetically
+        const uniqueCapabilities = new Map();
+        communityEntries.forEach(entry => {
+          const capabilityKey = entry.capability.toLowerCase();
+          if (!uniqueCapabilities.has(capabilityKey)) {
+            uniqueCapabilities.set(capabilityKey, entry);
+          }
+        });
+        return Array.from(uniqueCapabilities.values())
+          .sort((a, b) => a.capability.toLowerCase().localeCompare(b.capability.toLowerCase()));
+      })()
     : selectedCommunityCategory
     ? communityEntries.filter(e => e.category === selectedCommunityCategory)
     : [];
@@ -624,6 +713,7 @@ useEffect(() => { fetchCommunityEntries(); }, []);
            {/* Community Inspiration Section */}
            <section className="mt-12 bg-white rounded-lg shadow p-6">
             <h2 className="text-xl font-bold mb-3">Share & Explore Capabilities</h2>
+            <p className="text-gray-600 text-sm mb-4">Contribute your unique capabilities and discover what others have shared. This is a community space where everyone's strengths help inspire and guide each other.</p>
             <form onSubmit={handleCommunitySubmit} className="flex flex-col md:flex-row gap-2 mb-6">
               <input
                 type="text"
@@ -648,9 +738,13 @@ useEffect(() => { fetchCommunityEntries(); }, []);
             ) : (
               <Accordion 
                 allowMultiple={true}
-                forceOpenItems={forceOpenAccordion ? new Set([uniqueCategories.indexOf(forceOpenAccordion)]) : undefined}
+                forceOpenItems={forceOpenAccordion ? new Set([uniqueCommunityCategories.indexOf(forceOpenAccordion)]) : undefined}
+                onForceOpenClear={(index) => {
+                  // Clear force-open state when user manually tries to close - ACCORDION FIX v3 2025-08-03
+                  setForceOpenAccordion(null);
+                }}
               >
-                {uniqueCategories.map(category => {
+                {uniqueCommunityCategories.map(category => {
                   const categoryEntries = communityEntries.filter(entry => entry.category === category);
                   return (
                     <AccordionItem
