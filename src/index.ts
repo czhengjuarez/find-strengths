@@ -348,6 +348,44 @@ app.delete('/community-entries/:id', async (c) => {
   return c.text('Entry deleted', 200);
 });
 
+// Update category name for all entries in a category (must come before :id route)
+app.put('/community-entries/update-category', async (c) => {
+  try {
+    const { oldCategory, newCategory } = await c.req.json();
+    if (!oldCategory || !newCategory) {
+      return c.json({ error: 'Both oldCategory and newCategory are required' }, 400);
+    }
+    
+    await c.env.DB.prepare(
+      'UPDATE community_entries SET category = ? WHERE category = ?'
+    ).bind(newCategory, oldCategory).run();
+    
+    return c.json({ message: 'Category updated successfully' }, 200);
+  } catch (error) {
+    return c.json({ error: 'Failed to update category' }, 500);
+  }
+});
+
+// Update individual capability text by entry id
+app.put('/community-entries/:id', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const { capability } = await c.req.json();
+    
+    if (!capability || !capability.trim()) {
+      return c.json({ error: 'Capability text is required' }, 400);
+    }
+    
+    await c.env.DB.prepare(
+      'UPDATE community_entries SET capability = ? WHERE id = ?'
+    ).bind(capability.trim(), id).run();
+    
+    return c.json({ message: 'Capability updated successfully' }, 200);
+  } catch (error) {
+    return c.json({ error: 'Failed to update capability' }, 500);
+  }
+});
+
 // Delete all community entries in a category
 app.delete('/community-entries/category/:category', async (c) => {
   const category = decodeURIComponent(c.req.param('category'));

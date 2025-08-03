@@ -4,7 +4,7 @@ import { ConfirmModal } from "./components/ConfirmModal";
 import { CapabilityInput } from "./components/CapabilityInput";
 import { Button } from "./components/ui/button";
 import { Accordion, AccordionItem } from "./components/ui/accordion";
-import { Trash2 } from "lucide-react";
+import { Trash2, Edit2, Check, X } from "lucide-react";
 import { RankingStep } from "./components/RankingStep";
 import { ResultsGrid } from "./components/ResultsGrid";
 import { Header } from "./components/Header";
@@ -40,6 +40,13 @@ function AppContent() {
   const [communityEntries, setCommunityEntries] = useState<{id?: number, category: string, capability: string}[]>([]);
   const [entryToDelete, setEntryToDelete] = useState<{id: number, category?: string, capability?: string, content?: string} | null>(null);
   const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
+  const [categoryToEdit, setCategoryToEdit] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState("");
+  const [forceOpenAccordion, setForceOpenAccordion] = useState<string | null>(null);
+
+  // Capability editing state
+  const [capabilityToEdit, setCapabilityToEdit] = useState<number | null>(null);
+  const [editingCapabilityText, setEditingCapabilityText] = useState("");
   const [userEntryToDelete, setUserEntryToDelete] = useState<{id: number, content: string} | null>(null);
   const [inputCategory, setInputCategory] = useState("");
   const [inputCapability, setInputCapability] = useState("");
@@ -48,15 +55,34 @@ function AppContent() {
   const [pendingCapabilities, setPendingCapabilities] = useState<Capability[]>([]);
   const [saveNotification, setSaveNotification] = useState<string | null>(null);
 
+// Normalize category input: capitalize first letter, check for existing case-insensitive match
+const normalizeCategory = (input: string): string => {
+  const trimmed = input.trim();
+  if (!trimmed) return trimmed;
+  
+  // Create properly capitalized version
+  const capitalized = trimmed.charAt(0).toUpperCase() + trimmed.slice(1).toLowerCase();
+  
+  // Check if a category with same name (case-insensitive) already exists
+  const existingCategory = communityEntries.find(entry => 
+    entry.category.toLowerCase() === trimmed.toLowerCase()
+  );
+  
+  // Return existing capitalized version if found, otherwise return new capitalized version
+  return existingCategory ? existingCategory.category : capitalized;
+};
+
 const handleCommunitySubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   if (inputCategory.trim() && inputCapability.trim()) {
+    const normalizedCategory = normalizeCategory(inputCategory);
+    
     // Send to backend
     await fetch('/community-entries', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        category: inputCategory.trim(),
+        category: normalizedCategory,
         capability: inputCapability.trim(),
       })
     });
@@ -65,6 +91,99 @@ const handleCommunitySubmit = async (e: React.FormEvent) => {
     setInputCategory("");
     setInputCapability("");
   }
+};
+
+// Handle category editing
+const handleCategoryEdit = async (oldCategory: string, newCategory: string) => {
+  const normalizedNewCategory = normalizeCategory(newCategory);
+  
+  if (!normalizedNewCategory.trim() || normalizedNewCategory === oldCategory) {
+    setCategoryToEdit(null);
+    setEditingCategoryName("");
+    return;
+  }
+  
+  try {
+    // Update all entries with the old category to use the new category
+    const response = await fetch('/community-entries/update-category', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        oldCategory,
+        newCategory: normalizedNewCategory,
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    // Refresh the entries
+    await fetchCommunityEntries();
+    
+    // Reset editing state and accordion auto-open
+    setCategoryToEdit(null);
+    setEditingCategoryName("");
+    setForceOpenAccordion(null);
+  } catch (error) {
+    console.error('Error updating category:', error);
+  }
+};
+
+// Start editing a category and auto-open accordion
+const startEditingCategory = (category: string) => {
+  setCategoryToEdit(category);
+  setEditingCategoryName(category);
+  setForceOpenAccordion(category); // Auto-open accordion for this category
+};
+
+// Cancel editing and reset accordion state
+const cancelEditingCategory = () => {
+  setCategoryToEdit(null);
+  setEditingCategoryName("");
+  setForceOpenAccordion(null); // Reset accordion auto-open state
+};
+
+// Start editing a capability
+const startEditingCapability = (entryId: number, currentText: string) => {
+  setCapabilityToEdit(entryId);
+  setEditingCapabilityText(currentText);
+};
+
+// Handle capability edit submission
+const handleCapabilityEdit = async (entryId: number, newText: string) => {
+  const trimmedText = newText.trim();
+  if (!trimmedText) {
+    cancelEditingCapability();
+    return;
+  }
+  
+  try {
+    const response = await fetch(`/community-entries/${entryId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ capability: trimmedText })
+    });
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    // Refresh the entries
+    await fetchCommunityEntries();
+    
+    // Reset editing state
+    cancelEditingCapability();
+  } catch (error) {
+    console.error('Error updating capability:', error);
+  }
+};
+
+// Cancel capability editing
+const cancelEditingCapability = () => {
+  setCapabilityToEdit(null);
+  setEditingCapabilityText("");
 };
 
 // Fetch user entries - user-specific for logged-in users, empty for guests
@@ -225,10 +344,12 @@ useEffect(() => { fetchCommunityEntries(); }, []);
   const uniqueCategories = Array.from(new Set(communityEntries.map(entry => entry.category)));
 
   // For INPUT step Community filter
-  const uniqueCommunityCategories = Array.from(new Set(communityEntries.map(entry => entry.category)));
-  const filteredCommunityEntries = selectedCommunityCategory
+  const uniqueCommunityCategories = Array.from(new Set(communityEntries.map(entry => entry.category))).sort((a, b) => a.toLowerCase().localeCompare(b.toLowerCase()));
+  const filteredCommunityEntries = selectedCommunityCategory === "all"
+    ? communityEntries
+    : selectedCommunityCategory
     ? communityEntries.filter(e => e.category === selectedCommunityCategory)
-    : communityEntries;
+    : [];
 
   const handleStartRanking = () => {
     const currentFilled = capabilities.filter(c => c.text.trim() !== '');
@@ -363,9 +484,10 @@ useEffect(() => { fetchCommunityEntries(); }, []);
                          className="border rounded px-2 py-1 text-sm max-w-40 truncate"
                          value={selectedCommunityCategory}
                          onChange={e => setSelectedCommunityCategory(e.target.value)}
-                         title={selectedCommunityCategory || "All Categories"}
+                         title={selectedCommunityCategory || "Select a Category"}
                        >
-                         <option value="">All Categories</option>
+                         <option value="" disabled>Select a Category</option>
+                         <option value="all">All Categories</option>
                          {uniqueCommunityCategories.map(cat => (
                            <option key={cat} value={cat} title={cat}>
                              {cat.length > 20 ? `${cat.substring(0, 20)}...` : cat}
@@ -524,37 +646,135 @@ useEffect(() => { fetchCommunityEntries(); }, []);
             {uniqueCategories.length === 0 ? (
               <p className="text-gray-500 italic">No capabilities shared yet. Add some above to get started!</p>
             ) : (
-              <Accordion allowMultiple={true}>
+              <Accordion 
+                allowMultiple={true}
+                forceOpenItems={forceOpenAccordion ? new Set([uniqueCategories.indexOf(forceOpenAccordion)]) : undefined}
+              >
                 {uniqueCategories.map(category => {
                   const categoryEntries = communityEntries.filter(entry => entry.category === category);
                   return (
                     <AccordionItem
                       key={category}
-                      title={`${category} (${categoryEntries.length})`}
-                      actions={
-                        <button
-                          className="p-1 rounded hover:bg-red-100"
-                          onClick={() => setCategoryToDelete(category)}
-                          title="Delete entire category"
-                        >
-                          <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
-                        </button>
-                      }
+                      title={categoryToEdit === category ? "Editing Category" : `${category} (${categoryEntries.length})`}
+                      actions={categoryToEdit === category ? null : (
+                        <div className="flex gap-1">
+                          <button
+                            className="p-1 rounded hover:bg-blue-100"
+                            onClick={() => startEditingCategory(category)}
+                            title="Edit category name"
+                          >
+                            <Edit2 className="h-4 w-4 text-gray-400 hover:text-blue-500" />
+                          </button>
+                          <button
+                            className="p-1 rounded hover:bg-red-100"
+                            onClick={() => setCategoryToDelete(category)}
+                            title="Delete entire category"
+                          >
+                            <Trash2 className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                          </button>
+                        </div>
+                      )}
                     >
+                      {categoryToEdit === category ? (
+                        <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+                          <div className="flex items-center gap-2">
+                            <label className="text-sm font-medium text-blue-800">Edit category name:</label>
+                            <input
+                              type="text"
+                              value={editingCategoryName}
+                              onChange={(e) => setEditingCategoryName(e.target.value)}
+                              className="border rounded px-2 py-1 text-sm flex-1"
+                              placeholder="Category name"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') {
+                                  handleCategoryEdit(category, editingCategoryName);
+                                } else if (e.key === 'Escape') {
+                                  cancelEditingCategory();
+                                }
+                              }}
+                            />
+                            <button
+                              onClick={() => handleCategoryEdit(category, editingCategoryName)}
+                              className="px-3 py-1 text-white rounded hover:opacity-90 text-sm flex items-center gap-1"
+                              style={{ backgroundColor: '#8F1F57' }}
+                              title="Save changes"
+                            >
+                              <Check className="h-3 w-3" />
+                              Save
+                            </button>
+                            <button
+                              onClick={cancelEditingCategory}
+                              className="px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm flex items-center gap-1"
+                              title="Cancel editing"
+                            >
+                              <X className="h-3 w-3" />
+                              Cancel
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
                       <div className="space-y-2">
                         {categoryEntries.map((entry, idx) => (
                           <div key={entry.id ?? idx} className="border rounded px-3 py-2 flex items-center justify-between bg-gray-50">
-                            <span className="text-gray-800">{entry.capability}</span>
-                            {entry.id && (
-                              <button
-                                className="p-1 rounded hover:bg-red-100"
-                                title="Delete capability"
-                                onClick={() => setEntryToDelete(entry as any)}
-                              >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 hover:text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                </svg>
-                              </button>
+                            {capabilityToEdit === entry.id ? (
+                              // Editing mode
+                              <div className="flex items-center gap-2 flex-1">
+                                <input
+                                  type="text"
+                                  value={editingCapabilityText}
+                                  onChange={(e) => setEditingCapabilityText(e.target.value)}
+                                  className="flex-1 px-2 py-1 border rounded text-sm"
+                                  autoFocus
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      handleCapabilityEdit(entry.id!, editingCapabilityText);
+                                    } else if (e.key === 'Escape') {
+                                      cancelEditingCapability();
+                                    }
+                                  }}
+                                />
+                                <button
+                                  onClick={() => handleCapabilityEdit(entry.id!, editingCapabilityText)}
+                                  className="px-2 py-1 text-white rounded hover:opacity-90 text-sm flex items-center gap-1"
+                                  style={{ backgroundColor: '#8F1F57' }}
+                                  title="Save changes"
+                                >
+                                  <Check className="h-3 w-3" />
+                                </button>
+                                <button
+                                  onClick={cancelEditingCapability}
+                                  className="px-2 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 text-sm flex items-center gap-1"
+                                  title="Cancel editing"
+                                >
+                                  <X className="h-3 w-3" />
+                                </button>
+                              </div>
+                            ) : (
+                              // Display mode
+                              <>
+                                <span className="text-gray-800">{entry.capability}</span>
+                                {entry.id && (
+                                  <div className="flex gap-1">
+                                    <button
+                                      className="p-1 rounded hover:bg-blue-100"
+                                      onClick={() => startEditingCapability(entry.id!, entry.capability)}
+                                      title="Edit capability"
+                                    >
+                                      <Edit2 className="h-4 w-4 text-gray-400 hover:text-blue-500" />
+                                    </button>
+                                    <button
+                                      className="p-1 rounded hover:bg-red-100"
+                                      title="Delete capability"
+                                      onClick={() => setEntryToDelete(entry as any)}
+                                    >
+                                      <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 text-gray-400 hover:text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                )}
+                              </>
                             )}
                           </div>
                         ))}

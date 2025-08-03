@@ -51,11 +51,13 @@ export const AccordionItem: React.FC<AccordionItemProps> = ({
 interface AccordionProps {
   children: React.ReactNode;
   allowMultiple?: boolean;
+  forceOpenItems?: Set<number>; // External control for forcing items open
 }
 
 export const Accordion: React.FC<AccordionProps> = ({ 
   children, 
-  allowMultiple = false 
+  allowMultiple = false,
+  forceOpenItems
 }) => {
   const [openItems, setOpenItems] = useState<Set<number>>(new Set());
 
@@ -77,9 +79,11 @@ export const Accordion: React.FC<AccordionProps> = ({
     <div className="space-y-2">
       {React.Children.map(children, (child, index) => {
         if (React.isValidElement<AccordionItemProps>(child) && child.type === AccordionItem) {
+          const isForceOpen = forceOpenItems?.has(index) || false;
+          const isNormallyOpen = openItems.has(index);
           return React.cloneElement(child, {
             ...child.props,
-            isOpen: openItems.has(index),
+            isOpen: isForceOpen || isNormallyOpen,
             onToggle: () => handleToggle(index),
           });
         }
