@@ -37,23 +37,45 @@ This application is based on a performance framework that emphasizes identifying
 ## 🛠️ Technology Stack
 
 ### Frontend
-- **React 19** - Modern React with latest features
-- **TypeScript** - Type-safe development
-- **Vite** - Fast build tool and development server
-- **Tailwind CSS** - Utility-first CSS framework
+- **React** `^19.1.0` - Modern React with latest features
+- **TypeScript** `~5.8.3` - Type-safe development
+- **Vite** `^7.0.4` - Fast build tool and development server
+- **Tailwind CSS** `^3.4.17` - Utility-first CSS framework
 - **Radix UI** - Accessible component primitives
+  - `@radix-ui/react-accordion` `^1.2.11`
+  - `@radix-ui/react-checkbox` `^1.3.2`
+  - `@radix-ui/react-label` `^2.1.7`
+  - `@radix-ui/react-slot` `^1.2.3`
 
 ### Backend
 - **Cloudflare Workers** - Serverless backend platform
-- **Hono** - Fast web framework for Workers
+- **Hono** `^4.8.5` - Fast web framework for Workers
 - **Cloudflare D1** - SQLite-compatible serverless database
 - **JWT Authentication** - Secure token-based auth
 - **Google OAuth 2.0** - Social authentication
 
+### UI & Styling
+- **Lucide React** `^0.525.0` - Icon library
+- **Class Variance Authority** `^0.7.1` - Component variants
+- **Tailwind Merge** `^3.3.1` - Utility class merging
+- **Tailwind CSS Animate** `^1.0.7` - Animation utilities
+- **clsx** `^2.1.1` - Conditional class names
+
 ### Development Tools
-- **ESLint** - Code linting and formatting
-- **TypeScript** - Static type checking
+- **ESLint** `^9.30.1` - Code linting and formatting
+- **TypeScript ESLint** `^8.35.1` - TypeScript-specific linting
+- **Autoprefixer** `^10.4.21` - CSS vendor prefixes
+- **PostCSS** `^8.5.6` - CSS processing
 - **Wrangler** - Cloudflare Workers CLI
+
+### Additional Features
+- **DND Kit** - Drag and drop functionality
+  - `@dnd-kit/core` `^6.3.1`
+  - `@dnd-kit/sortable` `^10.0.0`
+  - `@dnd-kit/utilities` `^3.2.2`
+- **Export Capabilities**
+  - `html2canvas` `^1.4.1` - Screenshot generation
+  - `jspdf` `^3.0.1` - PDF generation
 
 ## 🏃‍♂️ Quick Start
 
