@@ -2,6 +2,12 @@
 
 A React-based web application that helps users discover and organize their professional strengths through an interactive assessment tool. Users can create personal lists of capabilities, explore community-shared strengths, and rank their skills by enjoyment and proficiency.
 
+## 📖 Context & Concept
+
+This application is based on a performance framework that emphasizes identifying and leveraging individual strengths for professional growth. The core concept focuses on the intersection of **what you enjoy doing** and **what you're good at** - a powerful combination for sustainable high performance.
+
+**📚 Background Reading**: For detailed context on the underlying methodology and framework, see: [Performance and Growth: A Smarter Approach to Professional Development](https://changying.substack.com/p/performance-and-growth-a-smarter)
+
 ## 🌟 Features
 
 ### Core Functionality
