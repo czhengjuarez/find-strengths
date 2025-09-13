@@ -1,6 +1,6 @@
 name = "find-your-strengths-worker"
 main = "src/index.ts"
-compatibility_date = "2024-01-01" # Consider updating this to a more recent date like "2025-07-24" for latest features
+compatibility_date = "2025-09-13" 
 
 [site]
 bucket = "./dist"

@@ -10,6 +10,8 @@ interface HeaderProps {
 export const Header: React.FC<HeaderProps> = ({ onSignInClick }) => {
   const { user, isAuthenticated } = useAuth();
 
+  console.log('Header: Auth state', { user, isAuthenticated });
+
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/60">
       <div className="container flex h-14 items-center justify-between px-4 mx-auto max-w-7xl">

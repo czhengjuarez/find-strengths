@@ -184,7 +184,7 @@ app.get('/auth/google/callback', async (req, res) => {
       client_secret: GOOGLE_CLIENT_SECRET,
       code,
       grant_type: 'authorization_code',
-      redirect_uri: 'http://localhost:3001/auth/google/callback'
+      redirect_uri: 'http://localhost:3000/auth/google/callback'
     });
     
     const { access_token } = tokenResponse.data;
@@ -225,7 +225,7 @@ app.get('/auth/google/callback', async (req, res) => {
     );
     
     // Redirect to frontend with token
-    res.redirect(`http://localhost:3001?token=${token}&user=${encodeURIComponent(JSON.stringify({
+    res.redirect(`http://localhost:3000?token=${token}&user=${encodeURIComponent(JSON.stringify({
       id: user.id,
       email: user.email,
       name: user.name,

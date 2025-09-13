@@ -15,10 +15,24 @@ export default defineConfig({
     },
   },
   server: {
-    port: 3001,
+    port: 3000,
+    host: true,
     proxy: {
-      '/auth': 'http://localhost:4000',
-      '/entries': 'http://localhost:4000',
+      '/auth': {
+        target: 'https://find-your-strengths-worker.coscient.workers.dev',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/entries': {
+        target: 'https://find-your-strengths-worker.coscient.workers.dev',
+        changeOrigin: true,
+        secure: false,
+      },
+      '/community-entries': {
+        target: 'https://find-your-strengths-worker.coscient.workers.dev',
+        changeOrigin: true,
+        secure: false,
+      },
     },
   },
   build: {
